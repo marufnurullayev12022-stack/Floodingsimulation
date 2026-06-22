@@ -28,9 +28,37 @@ export interface PointSource {
   lat: number;
 }
 
+// 3D Custom Objects drawn by the user (like in ArcGIS Pro)
+export interface Custom3DObject {
+  id: string;
+  type: "box" | "polygon";
+  name: string;
+  // For box:
+  center?: { lng: number; lat: number };
+  length?: number; // north-south distance in meters
+  width?: number;  // east-west distance in meters
+  // For polygon:
+  positions?: { lng: number; lat: number }[];
+  // Common details:
+  height: number;  // extrusion height in meters
+  color: string;   // hex string for color
+}
+
 interface AppState {
   ionToken: string;
   setIonToken: (t: string) => void;
+
+  customObjects: Custom3DObject[];
+  addCustomObject: (obj: Custom3DObject) => void;
+  removeCustomObject: (id: string) => void;
+  clearCustomObjects: () => void;
+
+  drawMode: "none" | "box" | "polygon";
+  setDrawMode: (mode: "none" | "box" | "polygon") => void;
+  drawPoints: { lng: number; lat: number }[];
+  setDrawPoints: (pts: { lng: number; lat: number }[]) => void;
+  activeObject: Custom3DObject | null;
+  setActiveObject: (obj: Custom3DObject | null) => void;
 
   geojson: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null;
   setGeojson: (g: AppState["geojson"]) => void;
@@ -200,6 +228,18 @@ export const useAppStore = create<AppState>((set) => ({
   status: "Ready. Load a GeoJSON polygon to begin.",
   setStatus: (s) => set({ status: s }),
 
+  customObjects: [],
+  addCustomObject: (obj) => set((s) => ({ customObjects: [...s.customObjects, obj] })),
+  removeCustomObject: (id) => set((s) => ({ customObjects: s.customObjects.filter((o) => o.id !== id) })),
+  clearCustomObjects: () => set({ customObjects: [] }),
+
+  drawMode: "none",
+  setDrawMode: (mode) => set({ drawMode: mode, drawPoints: [], activeObject: null }),
+  drawPoints: [],
+  setDrawPoints: (pts) => set({ drawPoints: pts }),
+  activeObject: null,
+  setActiveObject: (obj) => set({ activeObject: obj }),
+
   resetSimulation: () =>
     set({
       waterLevelOverride: null,
@@ -209,5 +249,8 @@ export const useAppStore = create<AppState>((set) => ({
       isPlaying: false,
       elapsedSec: 0,
       levelHistory: [],
+      drawMode: "none",
+      drawPoints: [],
+      activeObject: null,
     }),
 }));

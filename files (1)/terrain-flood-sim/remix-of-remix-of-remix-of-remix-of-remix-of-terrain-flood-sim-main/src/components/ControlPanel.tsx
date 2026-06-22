@@ -3,7 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import {
   Mountain, Upload, Loader2, MapPin, Key, CloudRain, Crosshair, RotateCcw, Droplets,
   Play, Pause, MousePointerClick, Gauge, Clock, Trash2, Video, StopCircle, AlertTriangle,
-  Shield, Download,
+  Shield, Download, Building2, Box, Shapes, Check, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,10 @@ export function ControlPanel() {
     floodResult,
     status, setStatus,
     resetSimulation,
+    drawMode, setDrawMode,
+    drawPoints, setDrawPoints,
+    activeObject, setActiveObject,
+    customObjects, addCustomObject, removeCustomObject, clearCustomObjects,
   } = useAppStore();
 
   const [tokenInput, setTokenInput] = useState(ionToken);
@@ -484,6 +488,145 @@ export function ControlPanel() {
             <Crosshair className="mr-1.5 h-3.5 w-3.5" /> Point source
           </Button>
         </div>
+      </section>
+
+      {/* 3D Obyektlar Tuzuvchi */}
+      <Separator />
+      <section className="space-y-3 rounded-md border border-cyan-500/20 bg-cyan-950/5 p-3">
+        <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-cyan-400">
+          <Building2 className="h-4 w-4 text-cyan-400" /> 3D Obyektlar Tuzuvchi (ArcGIS Pro)
+        </Label>
+
+        {drawMode === "none" && !activeObject && (
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="outline" className="h-8 text-xs font-medium" onClick={() => setDrawMode("box")}>
+              <Box className="mr-1.5 h-3.5 w-3.5 text-cyan-400" /> To'rtburchak Bino
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs font-medium" onClick={() => setDrawMode("polygon")}>
+              <Shapes className="mr-1.5 h-3.5 w-3.5 text-cyan-400" /> Ko'pburchak Bino
+            </Button>
+          </div>
+        )}
+
+        {drawMode !== "none" && (
+          <div className="rounded-md bg-yellow-500/10 border border-yellow-500/30 p-2 text-xs space-y-2">
+            <div className="text-yellow-400 flex items-center gap-1 font-medium">
+              <Loader2 className="h-3 w-3 animate-spin text-yellow-400" />
+              {drawMode === "box"
+                ? (drawPoints.length === 0 ? "Xaritadan 1-burchakni tanlang..." : "Qarama-qarshi burchakni belgilash uchun bosing...")
+                : `Ko'pburchak chizilmoqda... (${drawPoints.length} nuqta)`
+              }
+            </div>
+            <div className="flex gap-2">
+              {drawMode === "polygon" && drawPoints.length >= 3 && (
+                <Button size="sm" className="h-7 text-xs flex-1 bg-green-600 hover:bg-green-500 text-white font-medium border-0" onClick={() => {
+                  setActiveObject({
+                    id: "temp",
+                    type: "polygon",
+                    name: "Yangi Ko'pburchak Bino",
+                    positions: [...drawPoints],
+                    height: 15,
+                    color: "#fb923c"
+                  });
+                  setDrawPoints([]);
+                  setDrawMode("none");
+                }}>
+                  <Check className="mr-1 h-3 w-3" /> Tugatish
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="h-7 text-xs flex-1" onClick={() => setDrawMode("none")}>
+                <X className="mr-1 h-3 w-3" /> Bekor qilish
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeObject && (
+          <div className="rounded-md border border-cyan-500/30 bg-cyan-950/20 p-2.5 space-y-3 text-xs">
+            <div className="font-semibold text-cyan-300">Yangi Obyekt Sozlamalari</div>
+            
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Nomi</Label>
+              <Input className="h-7 text-xs bg-background/50" value={activeObject.name} 
+                onChange={(e) => setActiveObject({ ...activeObject, name: e.target.value })} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Balandligi (m)</Label>
+                <Input type="number" className="h-7 text-xs bg-background/50" value={activeObject.height} 
+                  onChange={(e) => setActiveObject({ ...activeObject, height: Math.max(1, Number(e.target.value) || 10) })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Rangi</Label>
+                <div className="flex gap-1">
+                  <Input type="color" className="h-7 w-8 p-0 cursor-pointer border-0 bg-transparent" value={activeObject.color} 
+                    onChange={(e) => setActiveObject({ ...activeObject, color: e.target.value })} />
+                  <Input className="h-7 text-xs flex-1 uppercase bg-background/50 font-mono" value={activeObject.color} 
+                    onChange={(e) => setActiveObject({ ...activeObject, color: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {activeObject.type === "box" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Uzunligi (NS - m)</Label>
+                  <Input type="number" className="h-7 text-xs bg-background/50" value={activeObject.length} 
+                    onChange={(e) => setActiveObject({ ...activeObject, length: Math.max(1, Number(e.target.value) || 10) })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Eni (EW - m)</Label>
+                  <Input type="number" className="h-7 text-xs bg-background/50" value={activeObject.width} 
+                    onChange={(e) => setActiveObject({ ...activeObject, width: Math.max(1, Number(e.target.value) || 10) })} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-medium border-0" onClick={() => {
+                addCustomObject({
+                  ...activeObject,
+                  id: Date.now().toString()
+                });
+                setActiveObject(null);
+                toast.success("3D Obyekt saqlandi");
+              }}>
+                Saqlash
+              </Button>
+              <Button size="sm" variant="secondary" className="flex-1" onClick={() => setActiveObject(null)}>
+                Bekor qilish
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {customObjects.length > 0 && (
+          <div className="space-y-1.5 mt-2">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Chizilgan obyektlar ({customObjects.length})</span>
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-transparent" onClick={clearCustomObjects}>
+                Hammasini o'chirish
+              </Button>
+            </div>
+            <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+              {customObjects.map((obj) => (
+                <div key={obj.id} className="flex items-center justify-between rounded border border-border bg-background/50 p-1.5 text-[11px]">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: obj.color }} />
+                    <span className="font-medium truncate">{obj.name}</span>
+                    <span className="text-[9px] text-muted-foreground">
+                      ({obj.type === "box" ? `${obj.width}x${obj.length}` : "ko'pburchak"}, {obj.height}m)
+                    </span>
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-red-400 hover:bg-transparent" onClick={() => removeCustomObject(obj.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Playback (duration + speed) */}
