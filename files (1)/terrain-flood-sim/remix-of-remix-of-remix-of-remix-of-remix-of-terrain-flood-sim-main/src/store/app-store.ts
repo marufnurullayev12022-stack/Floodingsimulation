@@ -42,6 +42,7 @@ export interface Custom3DObject {
   // Common details:
   height: number;  // extrusion height in meters
   color: string;   // hex string for color
+  wallWidth?: number; // wall width/thickness in meters (0 for solid)
 }
 
 interface AppState {

@@ -278,11 +278,30 @@ export function CesiumViewer() {
     viewer.canvas.style.cursor = "crosshair";
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
 
+    // Robust coordinate picking helper
+    const pickCoordinates = (position: any) => {
+      let cart;
+      if (viewer.scene.pickPositionSupported) {
+        try {
+          cart = viewer.scene.pickPosition(position);
+        } catch (e) {}
+      }
+      if (!cart) {
+        const ray = viewer.camera.getPickRay(position);
+        if (ray) {
+          cart = viewer.scene.globe.pick(ray, viewer.scene);
+        }
+      }
+      if (!cart) {
+        cart = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
+      }
+      return cart;
+    };
+
     handler.setInputAction((click: any) => {
-      const ray = viewer.camera.getPickRay(click.position);
-      if (!ray) return;
-      const cart = viewer.scene.globe.pick(ray, viewer.scene);
+      const cart = pickCoordinates(click.position);
       if (!cart) return;
+      
       const carto = Cesium.Cartographic.fromCartesian(cart);
       const lng = Cesium.Math.toDegrees(carto.longitude);
       const lat = Cesium.Math.toDegrees(carto.latitude);
@@ -296,6 +315,14 @@ export function CesiumViewer() {
           // Second point of box (Point B)
           const ptA = drawPoints[0];
           const ptB = { lng, lat };
+
+          // Define the 4 corners of the rectangle
+          const positions = [
+            { lng: ptA.lng, lat: ptA.lat },
+            { lng: ptB.lng, lat: ptA.lat },
+            { lng: ptB.lng, lat: ptB.lat },
+            { lng: ptA.lng, lat: ptB.lat },
+          ];
 
           // Calculate center, length, and width using Turf
           const centerLng = (ptA.lng + ptB.lng) / 2;
@@ -315,19 +342,52 @@ export function CesiumViewer() {
             center: { lng: centerLng, lat: centerLat },
             length: Math.max(1, parseFloat(length.toFixed(1))),
             width: Math.max(1, parseFloat(width.toFixed(1))),
-            height: 10, // default height in meters
+            positions: positions,
+            height: 15, // default height in meters
+            wallWidth: 0, // default solid
             color: "#fb923c",
           });
           setDrawPoints([]);
           setDrawMode("none");
-          setStatus("2D shakl chizildi. Yon panelda balandlik, en va uzunlikni sozlab 'Saqlash' tugmasini bosing.");
+          setStatus("To'rtburchak bino chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
         }
       } else if (drawMode === "polygon") {
         const nextPts = [...drawPoints, { lng, lat }];
         setDrawPoints(nextPts);
-        setStatus(`Nuqta ${nextPts.length} qo'shildi. Yana nuqtalar qo'shing yoki 'Tugatish' tugmasini bosing.`);
+        setStatus(`Nuqta ${nextPts.length} qo'shildi. Tugatish uchun xaritada ikki marta bosing (double-click).`);
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    // Double click to finish polygon drawing
+    handler.setInputAction((click: any) => {
+      if (drawMode !== "polygon") return;
+      if (drawPoints.length < 2) {
+        setStatus("Ko'pburchak yaratish uchun kamada 3 ta nuqta kerak!");
+        return;
+      }
+
+      const cart = pickCoordinates(click.position);
+      if (!cart) return;
+
+      const carto = Cesium.Cartographic.fromCartesian(cart);
+      const lng = Cesium.Math.toDegrees(carto.longitude);
+      const lat = Cesium.Math.toDegrees(carto.latitude);
+
+      const finalPts = [...drawPoints, { lng, lat }];
+
+      setActiveObject({
+        id: "temp",
+        type: "polygon",
+        name: "Yangi Ko'pburchak Bino",
+        positions: finalPts,
+        height: 15,
+        wallWidth: 0,
+        color: "#fb923c",
+      });
+      setDrawPoints([]);
+      setDrawMode("none");
+      setStatus("Ko'pburchak chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
+    }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     return () => {
       handler.destroy();
@@ -335,7 +395,7 @@ export function CesiumViewer() {
     };
   }, [drawMode, drawPoints, setDrawPoints, setActiveObject, setDrawMode, setStatus]);
 
-  // Sync customObjects & temporary drawing previews with Cesium
+  // Sync customObjects & temporary drawing previews with Cesium (clamping to terrain)
   useEffect(() => {
     const viewer = viewerRef.current;
     const Cesium = window.Cesium;
@@ -351,90 +411,80 @@ export function CesiumViewer() {
     );
     oldEntities.forEach((e: any) => viewer.entities.remove(e));
 
-    // 2. Render saved custom objects
-    customObjects.forEach((obj: any) => {
-      if (obj.type === "box" && obj.center) {
-        viewer.entities.add({
-          name: `custom-obj-${obj.id}`,
-          position: Cesium.Cartesian3.fromDegrees(obj.center.lng, obj.center.lat, obj.height / 2),
-          box: {
-            dimensions: new Cesium.Cartesian3(obj.width, obj.length, obj.height),
-            material: Cesium.Color.fromCssColorString(obj.color).withAlpha(0.85),
-            outline: true,
-            outlineColor: Cesium.Color.BLACK,
-          },
-          label: {
-            text: obj.name,
-            font: "12px sans-serif",
-            pixelOffset: new Cesium.Cartesian2(0, -obj.height / 2 - 15),
-            heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          },
-        });
-      } else if (obj.type === "polygon" && obj.positions) {
-        viewer.entities.add({
-          name: `custom-obj-${obj.id}`,
-          polygon: {
-            hierarchy: new Cesium.PolygonHierarchy(
-              obj.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
-            ),
-            extrudedHeight: obj.height,
-            material: Cesium.Color.fromCssColorString(obj.color).withAlpha(0.85),
-            outline: true,
-            outlineColor: Cesium.Color.BLACK,
-          },
-          label: {
-            text: obj.name,
-            font: "12px sans-serif",
-            position: Cesium.BoundingSphere.fromPoints(
-              obj.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
-            ).center,
-            pixelOffset: new Cesium.Cartesian2(0, -obj.height - 15),
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          },
-        });
+    // Helper to draw objects with perfect terrain-clamping
+    const createObjectEntity = (obj: any, isPreview = false) => {
+      const entityId = isPreview ? "temp-draw-obj" : `custom-obj-${obj.id}`;
+      const color = Cesium.Color.fromCssColorString(obj.color).withAlpha(isPreview ? 0.6 : 0.85);
+
+      if (obj.positions) {
+        if (obj.wallWidth && obj.wallWidth > 0) {
+          // Render as extruded corridor (closed loop if box, or open/closed path if polygon)
+          const points = obj.type === "box" ? [...obj.positions, obj.positions[0]] : obj.positions;
+          viewer.entities.add({
+            name: entityId,
+            corridor: {
+              positions: points.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat)),
+              width: obj.wallWidth,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              extrudedHeightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              extrudedHeight: obj.height,
+              material: color,
+              outline: true,
+              outlineColor: Cesium.Color.BLACK,
+            },
+            label: isPreview ? undefined : {
+              text: obj.name,
+              font: "12px sans-serif",
+              position: Cesium.BoundingSphere.fromPoints(
+                obj.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
+              ).center,
+              pixelOffset: new Cesium.Cartesian2(0, -obj.height - 15),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              fillColor: Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            },
+          });
+        } else {
+          // Render as solid extruded polygon (snaps to terrain seamlessly)
+          viewer.entities.add({
+            name: entityId,
+            polygon: {
+              hierarchy: new Cesium.PolygonHierarchy(
+                obj.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
+              ),
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              extrudedHeightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              extrudedHeight: obj.height,
+              material: color,
+              outline: true,
+              outlineColor: Cesium.Color.BLACK,
+            },
+            label: isPreview ? undefined : {
+              text: obj.name,
+              font: "12px sans-serif",
+              position: Cesium.BoundingSphere.fromPoints(
+                obj.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
+              ).center,
+              pixelOffset: new Cesium.Cartesian2(0, -obj.height - 15),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              fillColor: Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            },
+          });
+        }
       }
-    });
+    };
+
+    // 2. Render saved custom objects
+    customObjects.forEach((obj: any) => createObjectEntity(obj, false));
 
     // 3. Render active object preview
     if (activeObject) {
-      if (activeObject.type === "box" && activeObject.center) {
-        viewer.entities.add({
-          name: "temp-draw-obj",
-          position: Cesium.Cartesian3.fromDegrees(
-            activeObject.center.lng,
-            activeObject.center.lat,
-            activeObject.height / 2
-          ),
-          box: {
-            dimensions: new Cesium.Cartesian3(activeObject.width, activeObject.length, activeObject.height),
-            material: Cesium.Color.fromCssColorString(activeObject.color).withAlpha(0.6),
-            outline: true,
-            outlineColor: Cesium.Color.BLACK,
-          },
-        });
-      } else if (activeObject.type === "polygon" && activeObject.positions) {
-        viewer.entities.add({
-          name: "temp-draw-obj",
-          polygon: {
-            hierarchy: new Cesium.PolygonHierarchy(
-              activeObject.positions.map((p: any) => Cesium.Cartesian3.fromDegrees(p.lng, p.lat))
-            ),
-            extrudedHeight: activeObject.height,
-            material: Cesium.Color.fromCssColorString(activeObject.color).withAlpha(0.6),
-            outline: true,
-            outlineColor: Cesium.Color.BLACK,
-          },
-        });
-      }
+      createObjectEntity(activeObject, true);
     }
 
     // 4. Render drawing dots/lines

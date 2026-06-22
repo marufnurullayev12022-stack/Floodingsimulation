@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { CesiumViewer } from "@/components/CesiumViewer";
 import { ControlPanel } from "@/components/ControlPanel";
+import { RightPanel } from "@/components/RightPanel";
 import { FloodLayer } from "@/components/FloodLayer";
 import { RainOverlay } from "@/components/RainOverlay";
 import { Toaster } from "@/components/ui/sonner";
@@ -70,6 +71,7 @@ function Home() {
       <FloodLayer />
       <RainOverlay />
       <ControlPanel />
+      <RightPanel />
       <Toaster position="bottom-right" theme="dark" richColors />
     </main>
   );
