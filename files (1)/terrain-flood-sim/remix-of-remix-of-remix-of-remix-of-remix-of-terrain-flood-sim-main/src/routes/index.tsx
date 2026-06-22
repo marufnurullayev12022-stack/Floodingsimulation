@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { CesiumViewer } from "@/components/CesiumViewer";
 import { ControlPanel } from "@/components/ControlPanel";
@@ -27,16 +27,9 @@ function Home() {
   const [loginPass, setLoginPass] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (localStorage.getItem("sim_auth") === "true") {
-      setIsLoggedIn(true);
-    }
-  }, []);
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (loginUser === "Simulation" && loginPass === "3Dsimulation") {
-      localStorage.setItem("sim_auth", "true");
       setIsLoggedIn(true);
       setError("");
     } else {
