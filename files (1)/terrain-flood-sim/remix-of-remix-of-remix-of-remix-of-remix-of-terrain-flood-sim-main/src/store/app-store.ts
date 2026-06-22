@@ -229,10 +229,31 @@ export const useAppStore = create<AppState>((set) => ({
   status: "Ready. Load a GeoJSON polygon to begin.",
   setStatus: (s) => set({ status: s }),
 
-  customObjects: [],
-  addCustomObject: (obj) => set((s) => ({ customObjects: [...s.customObjects, obj] })),
-  removeCustomObject: (id) => set((s) => ({ customObjects: s.customObjects.filter((o) => o.id !== id) })),
-  clearCustomObjects: () => set({ customObjects: [] }),
+  customObjects: typeof localStorage !== "undefined"
+    ? JSON.parse(localStorage.getItem("cesium_custom_3d_objects") ?? "[]")
+    : [],
+  addCustomObject: (obj) =>
+    set((s) => {
+      const next = [...s.customObjects, obj];
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("cesium_custom_3d_objects", JSON.stringify(next));
+      }
+      return { customObjects: next };
+    }),
+  removeCustomObject: (id) =>
+    set((s) => {
+      const next = s.customObjects.filter((o) => o.id !== id);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("cesium_custom_3d_objects", JSON.stringify(next));
+      }
+      return { customObjects: next };
+    }),
+  clearCustomObjects: () => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("cesium_custom_3d_objects");
+    }
+    set({ customObjects: [] });
+  },
 
   drawMode: "none",
   setDrawMode: (mode) => set({ drawMode: mode, drawPoints: [], activeObject: null }),

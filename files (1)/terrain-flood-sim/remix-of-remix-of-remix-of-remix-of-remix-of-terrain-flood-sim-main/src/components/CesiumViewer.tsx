@@ -23,6 +23,15 @@ export function CesiumViewer() {
   const setActiveObject = useAppStore((s) => s.setActiveObject);
   const customObjects = useAppStore((s) => s.customObjects);
 
+  const drawPointsRef = useRef<{ lng: number; lat: number }[]>([]);
+
+  // Sync ref with drawMode changes
+  useEffect(() => {
+    if (drawMode !== "none") {
+      drawPointsRef.current = [];
+    }
+  }, [drawMode]);
+
   // Initialise viewer once Cesium global is available.
   useEffect(() => {
     let cancelled = false;
@@ -298,6 +307,17 @@ export function CesiumViewer() {
       return cart;
     };
 
+    // Helper to check if new point is too close to the last added point
+    const isCloseToLast = (lng: number, lat: number) => {
+      const pts = drawPointsRef.current;
+      if (pts.length === 0) return false;
+      const last = pts[pts.length - 1];
+      const fromPt = turf.point([last.lng, last.lat]);
+      const toPt = turf.point([lng, lat]);
+      const dist = turf.distance(fromPt, toPt, { units: "meters" });
+      return dist < 1.0; // 1 meter threshold
+    };
+
     handler.setInputAction((click: any) => {
       const cart = pickCoordinates(click.position);
       if (!cart) return;
@@ -307,13 +327,16 @@ export function CesiumViewer() {
       const lat = Cesium.Math.toDegrees(carto.latitude);
 
       if (drawMode === "box") {
-        if (drawPoints.length === 0) {
+        if (drawPointsRef.current.length === 0) {
           // First point of box (Point A)
+          drawPointsRef.current = [{ lng, lat }];
           setDrawPoints([{ lng, lat }]);
           setStatus("Burchak 1 tanlandi. Qarama-qarshi burchakni belgilash uchun xaritaga bosing.");
         } else {
           // Second point of box (Point B)
-          const ptA = drawPoints[0];
+          if (isCloseToLast(lng, lat)) return;
+
+          const ptA = drawPointsRef.current[0];
           const ptB = { lng, lat };
 
           // Define the 4 corners of the rectangle
@@ -347,43 +370,53 @@ export function CesiumViewer() {
             wallWidth: 0, // default solid
             color: "#fb923c",
           });
+          drawPointsRef.current = [];
           setDrawPoints([]);
           setDrawMode("none");
           setStatus("To'rtburchak bino chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
         }
       } else if (drawMode === "polygon") {
-        const nextPts = [...drawPoints, { lng, lat }];
-        setDrawPoints(nextPts);
-        setStatus(`Nuqta ${nextPts.length} qo'shildi. Tugatish uchun xaritada ikki marta bosing (double-click).`);
+        if (isCloseToLast(lng, lat)) return;
+
+        drawPointsRef.current.push({ lng, lat });
+        setDrawPoints([...drawPointsRef.current]);
+        setStatus(`Nuqta ${drawPointsRef.current.length} qo'shildi. Tugatish uchun xaritada ikki marta bosing (double-click).`);
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     // Double click to finish polygon drawing
     handler.setInputAction((click: any) => {
       if (drawMode !== "polygon") return;
-      if (drawPoints.length < 2) {
-        setStatus("Ko'pburchak yaratish uchun kamada 3 ta nuqta kerak!");
+      
+      const pts = drawPointsRef.current;
+      if (pts.length < 3) {
+        setStatus("Ko'pburchak yaratish uchun kamida 3 ta nuqta kerak!");
         return;
       }
 
-      const cart = pickCoordinates(click.position);
-      if (!cart) return;
+      // Filter out duplicate vertices at the end
+      const uniquePts = pts.filter((pt, index, self) =>
+        index === self.findIndex((p) => {
+          const d = turf.distance(turf.point([p.lng, p.lat]), turf.point([pt.lng, pt.lat]), { units: "meters" });
+          return d < 0.5;
+        })
+      );
 
-      const carto = Cesium.Cartographic.fromCartesian(cart);
-      const lng = Cesium.Math.toDegrees(carto.longitude);
-      const lat = Cesium.Math.toDegrees(carto.latitude);
-
-      const finalPts = [...drawPoints, { lng, lat }];
+      if (uniquePts.length < 3) {
+        setStatus("Ko'pburchak yaratish uchun kamida 3 ta nuqta kerak!");
+        return;
+      }
 
       setActiveObject({
         id: "temp",
         type: "polygon",
         name: "Yangi Ko'pburchak Bino",
-        positions: finalPts,
+        positions: uniquePts,
         height: 15,
         wallWidth: 0,
         color: "#fb923c",
       });
+      drawPointsRef.current = [];
       setDrawPoints([]);
       setDrawMode("none");
       setStatus("Ko'pburchak chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
@@ -393,7 +426,7 @@ export function CesiumViewer() {
       handler.destroy();
       viewer.canvas.style.cursor = "";
     };
-  }, [drawMode, drawPoints, setDrawPoints, setActiveObject, setDrawMode, setStatus]);
+  }, [drawMode, setDrawPoints, setActiveObject, setDrawMode, setStatus]);
 
   // Sync customObjects & temporary drawing previews with Cesium (clamping to terrain)
   useEffect(() => {
