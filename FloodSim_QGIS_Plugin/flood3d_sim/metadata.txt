@@ -1,0 +1,18 @@
+[general]
+name=Flooding 3D Simulation
+qgisMinimumVersion=3.16
+description=3D relef suv toshqini simulyatsiyasi - QGIS ichida to'g'ridan-to'g'ri ishga tushirish va polygon layer eksport qilish imkoniyati bilan.
+version=1.0.0
+author=Nurullayev Ma'rufjon
+email=nurullayevmarufjon@example.com
+homepage=https://www.linkedin.com/in/nurullayevmarufjon/
+about=Bu plagin QGIS ichida 3D Terrain Flood Simulation veb-ilovasini ochadi. Imkoniyatlar: QGIS panelida to'liq 3D simulyatsiya (WebGL), Polygon layerlarni to'g'ridan-to'g'ri simulyatsiyaga eksport qilish, Local dev server boshqaruvi.
+tracker=
+repository=
+tags=flood,simulation,3D,terrain,hydraulics,water,cesium,GIS
+category=Plugins
+icon=icon.png
+experimental=False
+deprecated=False
+server=False
+hasProcessingProvider=False

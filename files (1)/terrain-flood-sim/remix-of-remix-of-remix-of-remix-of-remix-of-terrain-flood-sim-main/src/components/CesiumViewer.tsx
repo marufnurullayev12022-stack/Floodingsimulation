@@ -21,7 +21,9 @@ export function CesiumViewer() {
   const setDrawPoints = useAppStore((s) => s.setDrawPoints);
   const activeObject = useAppStore((s) => s.activeObject);
   const setActiveObject = useAppStore((s) => s.setActiveObject);
+  const addCustomObject = useAppStore((s) => s.addCustomObject);
   const customObjects = useAppStore((s) => s.customObjects);
+  const customObjectsCountRef = useRef(0);
 
   const drawPointsRef = useRef<{ lng: number; lat: number }[]>([]);
 
@@ -375,26 +377,27 @@ export function CesiumViewer() {
           setDrawMode("none");
           setStatus("To'rtburchak bino chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
         }
-      } else if (drawMode === "polygon") {
+      } else if (drawMode === "polygon" || drawMode === "line") {
         if (isCloseToLast(lng, lat)) return;
-
         drawPointsRef.current.push({ lng, lat });
         setDrawPoints([...drawPointsRef.current]);
-        setStatus(`Nuqta ${drawPointsRef.current.length} qo'shildi. Tugatish uchun xaritada ikki marta bosing (double-click).`);
+        const modeLabel = drawMode === "line" ? "Devor chizilmoqda" : "Polygon chizilmoqda";
+        setStatus(`${modeLabel}: ${drawPointsRef.current.length} nuqta. Tugatish uchun ikki marta bosing.`);
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    // Double click to finish polygon drawing
+    // Double click to finish drawing — open modal for params
     handler.setInputAction((click: any) => {
-      if (drawMode !== "polygon") return;
-      
+      if (drawMode !== "polygon" && drawMode !== "line") return;
+
       const pts = drawPointsRef.current;
-      if (pts.length < 3) {
-        setStatus("Ko'pburchak yaratish uchun kamida 3 ta nuqta kerak!");
+      const minPts = drawMode === "polygon" ? 3 : 2;
+      if (pts.length < minPts) {
+        setStatus(`Kamida ${minPts} ta nuqta kerak!`);
         return;
       }
 
-      // Filter out duplicate vertices at the end
+      // Filter duplicates
       const uniquePts = pts.filter((pt, index, self) =>
         index === self.findIndex((p) => {
           const d = turf.distance(turf.point([p.lng, p.lat]), turf.point([pt.lng, pt.lat]), { units: "meters" });
@@ -402,24 +405,28 @@ export function CesiumViewer() {
         })
       );
 
-      if (uniquePts.length < 3) {
-        setStatus("Ko'pburchak yaratish uchun kamida 3 ta nuqta kerak!");
+      if (uniquePts.length < minPts) {
+        setStatus(`Kamida ${minPts} ta nuqta kerak!`);
         return;
       }
 
+      // Open modal with default values — user sets height/width/color
       setActiveObject({
         id: "temp",
-        type: "polygon",
-        name: "Yangi Ko'pburchak Bino",
+        type: drawMode,
+        name: drawMode === "line" ? "Yangi Devor" : "Yangi Bino",
         positions: uniquePts,
-        height: 15,
-        wallWidth: 0,
-        color: "#fb923c",
+        height: drawMode === "line" ? 3 : 15,
+        wallWidth: drawMode === "line" ? 0.5 : 0,
+        color: drawMode === "line" ? "#64748b" : "#fb923c",
       });
+
       drawPointsRef.current = [];
       setDrawPoints([]);
       setDrawMode("none");
-      setStatus("Ko'pburchak chizildi. Sozlamalarni kiritib 'Saqlash' tugmasini bosing.");
+      setStatus(drawMode === "line"
+        ? "Devor chizildi. Eni va balandligini kiriting."
+        : "Bino chizildi. Balandligini kiriting.");
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     return () => {

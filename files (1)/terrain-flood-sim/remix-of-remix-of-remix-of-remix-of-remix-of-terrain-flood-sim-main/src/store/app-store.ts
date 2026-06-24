@@ -5,6 +5,7 @@ export type SimMode = "rainfall" | "point";
 
 export interface ElevationGrid {
   data: Float32Array;
+  baseData: Float32Array;
   nRows: number;
   nCols: number;
   bbox: [number, number, number, number];
@@ -31,13 +32,13 @@ export interface PointSource {
 // 3D Custom Objects drawn by the user (like in ArcGIS Pro)
 export interface Custom3DObject {
   id: string;
-  type: "box" | "polygon";
+  type: "box" | "polygon" | "line";
   name: string;
   // For box:
   center?: { lng: number; lat: number };
   length?: number; // north-south distance in meters
   width?: number;  // east-west distance in meters
-  // For polygon:
+  // For polygon or line:
   positions?: { lng: number; lat: number }[];
   // Common details:
   height: number;  // extrusion height in meters
@@ -54,8 +55,8 @@ interface AppState {
   removeCustomObject: (id: string) => void;
   clearCustomObjects: () => void;
 
-  drawMode: "none" | "box" | "polygon";
-  setDrawMode: (mode: "none" | "box" | "polygon") => void;
+  drawMode: "none" | "box" | "polygon" | "line";
+  setDrawMode: (mode: "none" | "box" | "polygon" | "line") => void;
   drawPoints: { lng: number; lat: number }[];
   setDrawPoints: (pts: { lng: number; lat: number }[]) => void;
   activeObject: Custom3DObject | null;
@@ -256,7 +257,7 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   drawMode: "none",
-  setDrawMode: (mode) => set({ drawMode: mode, drawPoints: [], activeObject: null }),
+  setDrawMode: (mode) => set({ drawMode: mode, drawPoints: [] }),
   drawPoints: [],
   setDrawPoints: (pts) => set({ drawPoints: pts }),
   activeObject: null,

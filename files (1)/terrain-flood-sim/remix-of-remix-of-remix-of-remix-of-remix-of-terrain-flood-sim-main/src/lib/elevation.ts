@@ -68,6 +68,7 @@ export async function sampleElevationGrid(
 
   return {
     data,
+    baseData: new Float32Array(data),
     nRows,
     nCols,
     bbox: [west, south, east, north],

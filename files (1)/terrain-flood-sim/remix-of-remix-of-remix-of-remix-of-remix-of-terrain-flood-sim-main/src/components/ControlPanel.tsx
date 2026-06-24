@@ -19,6 +19,7 @@ import { LevelChart } from "@/components/LevelChart";
 import { floodEngineState } from "@/components/FloodLayer";
 import * as turf from "@turf/turf";
 import { toast } from "sonner";
+import { rasterizeCustomObjects } from "@/lib/rasterize";
 
 const SAMPLE_GEOJSON = `{
   "type": "Feature",
@@ -57,6 +58,7 @@ export function ControlPanel() {
     ionToken, setIonToken,
     geojson, setGeojson,
     grid, setGrid,
+    customObjects,
     gridResolution, setGridResolution,
     samplingProgress, setSamplingProgress,
     mode, setMode,
@@ -97,6 +99,20 @@ export function ControlPanel() {
     }, 500);
     return () => clearInterval(id);
   }, []);
+
+  // Avtomatik Sample elevation grid
+  useEffect(() => {
+    if (geojson && !grid && !sampling) {
+      runSampling();
+    }
+  }, [geojson]);
+
+  // Rasterize buildings/walls into the DEM whenever they change
+  useEffect(() => {
+    if (grid && grid.baseData) {
+      rasterizeCustomObjects(grid, customObjects);
+    }
+  }, [grid, customObjects]);
 
   const toggleHazards = () => {
     floodEngineState.showHazards = !floodEngineState.showHazards;
@@ -395,20 +411,6 @@ export function ControlPanel() {
         <p className="mt-1 text-xs text-muted-foreground">Real terrain · rainfall &amp; point-source flooding</p>
       </header>
 
-      {/* Token */}
-      <section className="space-y-2">
-        <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-          <Key className="h-3.5 w-3.5" /> Cesium ion token <span className="text-[10px] normal-case">(optional)</span>
-        </Label>
-        <div className="flex gap-2">
-          <Input type="password" placeholder="Leave empty to use free ArcGIS terrain"
-            value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} />
-          <Button size="sm" onClick={() => { setIonToken(tokenInput.trim()); toast.success(tokenInput.trim() ? "Token saved" : "Using free terrain"); }}>Save</Button>
-        </div>
-      </section>
-
-      <Separator />
-
       {/* Area */}
       <section className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
@@ -457,10 +459,6 @@ export function ControlPanel() {
           />
           <Label htmlFor="clip-toggle" className="text-xs cursor-pointer">Clip globe to boundary (faster)</Label>
         </div>
-        <Button onClick={runSampling} disabled={sampling || !geojson} className="w-full">
-          {sampling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {sampling ? "Sampling terrain…" : "Sample elevation grid"}
-        </Button>
         {sampling && <Progress value={samplingProgress * 100} />}
         {grid && !sampling && (
           <div className="rounded-md border border-border bg-secondary/50 p-2 text-[11px] text-muted-foreground">
@@ -768,20 +766,7 @@ export function ControlPanel() {
             </Button>
           ) : null}
         </div>
-
-        {isAutoTouring ? (
-          <Button variant="destructive" size="sm" onClick={stopAutoTourRecord} className="w-full">
-            <StopCircle className="mr-1.5 h-3.5 w-3.5" /> Stop Auto Tour
-          </Button>
-        ) : (
-          <Button variant="default" size="sm" onClick={startAutoTourRecord} disabled={!grid} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-md">
-            <Video className="mr-1.5 h-3.5 w-3.5" /> 30s Avtomatik Yozish (Auto Tour)
-          </Button>
-        )}
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        "30s Avtomatik Yozish" tugmasi kamerani turli rakurslar bo'ylab aylantirib, 30 soniyalik simulyatsiyani yozib oladi va video (.webm) fayl ko'rinishida yuklab beradi.
-      </p>
 
       <footer className="rounded-md bg-secondary/40 p-2 text-[11px] text-muted-foreground">
         <strong className="text-foreground">Status:</strong> {status}
