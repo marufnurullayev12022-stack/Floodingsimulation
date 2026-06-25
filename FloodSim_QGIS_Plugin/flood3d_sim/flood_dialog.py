@@ -30,9 +30,24 @@ class FloodDialog(QDialog):
         # 1. AOI (Hudud chegarasi)
         aoi_group = QGroupBox("1. Simulyatsiya qilinadigan hudud (AOI - Poligon)")
         aoi_layout = QVBoxLayout()
+        
+        self.rb_canvas = QRadioButton("Joriy xarita ko'rinishi (Canvas Extent)")
+        self.rb_canvas.setChecked(True)
+        
+        self.rb_selection = QRadioButton("Tanlangan obyektlar (Selection)")
+        
+        self.rb_aoi_layer = QRadioButton("Barcha poligon qatlam")
+        
         self.aoi_combo = QComboBox()
-        aoi_layout.addWidget(QLabel("Poligon qatlamini tanlang:"))
+        self.aoi_combo.setEnabled(False)
+        
+        self.rb_aoi_layer.toggled.connect(lambda: self.aoi_combo.setEnabled(self.rb_aoi_layer.isChecked()))
+        
+        aoi_layout.addWidget(self.rb_canvas)
+        aoi_layout.addWidget(self.rb_selection)
+        aoi_layout.addWidget(self.rb_aoi_layer)
         aoi_layout.addWidget(self.aoi_combo)
+        
         aoi_group.setLayout(aoi_layout)
         layout.addWidget(aoi_group)
 
@@ -115,33 +130,70 @@ class FloodDialog(QDialog):
         return data
 
     def on_start(self):
-        aoi_layer_id = self.aoi_combo.currentData()
-        if not aoi_layer_id:
-            QMessageBox.warning(self, "Xatolik", "Iltimos hudud chegarasini tanlang!")
-            return
-
-        aoi_layer = QgsProject.instance().mapLayer(aoi_layer_id)
-        
         # O'zgarishlar veb-ilovaga borishi uchun react_app/public ga saqlaymiz
         react_public_dir = r"D:\Flooding3Dsimlation\files (1)\terrain-flood-sim\remix-of-remix-of-remix-of-remix-of-remix-of-terrain-flood-sim-main\public"
         
         if not os.path.exists(react_public_dir):
             os.makedirs(react_public_dir, exist_ok=True)
             
-        # 1. Export AOI to boundary.geojson
-        try:
-            aoi_geojson = self.get_layer_geojson(aoi_layer)
-            if not aoi_geojson.get("features"):
-                QMessageBox.warning(self, "Xatolik", "Tanlangan AOI qatlami bo'sh!")
+        boundary_feat = None
+        
+        if self.rb_aoi_layer.isChecked():
+            aoi_layer_id = self.aoi_combo.currentData()
+            if not aoi_layer_id:
+                QMessageBox.warning(self, "Xatolik", "Iltimos hudud chegarasini (poligon qatlam) tanlang!")
                 return
+            aoi_layer = QgsProject.instance().mapLayer(aoi_layer_id)
+            try:
+                aoi_geojson = self.get_layer_geojson(aoi_layer)
+                if not aoi_geojson.get("features"):
+                    QMessageBox.warning(self, "Xatolik", "Tanlangan AOI qatlami bo'sh!")
+                    return
+                boundary_feat = aoi_geojson["features"][0]
+            except Exception as e:
+                QMessageBox.critical(self, "Xato", f"Chegarani eksport qilishda xato:\n{e}")
+                return
+        else:
+            from qgis.core import QgsGeometry, QgsFeature
+            geom = None
+            crs = None
             
-            boundary_path = os.path.join(react_public_dir, 'boundary.geojson')
-            # Extract just the first feature as boundary
-            boundary_feat = aoi_geojson["features"][0]
+            if self.rb_canvas.isChecked():
+                extent = self.iface.mapCanvas().extent()
+                geom = QgsGeometry.fromRect(extent)
+                crs = self.iface.mapCanvas().mapSettings().destinationCrs()
+                
+            elif self.rb_selection.isChecked():
+                layer = self.iface.activeLayer()
+                if not layer:
+                    QMessageBox.warning(self, "Xatolik", "Qatlamlar panelidan biror qatlamni tanlang!")
+                    return
+                feats = list(layer.selectedFeatures())
+                if not feats:
+                    QMessageBox.warning(self, "Xatolik", "Faol qatlamda hech qanday obyekt (sariq rangda) tanlanmagan!")
+                    return
+                geom = feats[0].geometry()
+                crs = layer.crs()
+            
+            mem_layer = QgsVectorLayer(f"Polygon?crs={crs.authid()}", "temp_aoi", "memory")
+            pr = mem_layer.dataProvider()
+            f = QgsFeature()
+            f.setGeometry(geom)
+            pr.addFeatures([f])
+            
+            try:
+                aoi_geojson = self.get_layer_geojson(mem_layer)
+                boundary_feat = aoi_geojson["features"][0]
+            except Exception as e:
+                QMessageBox.critical(self, "Xato", f"Vaqtinchalik chegarani eksport qilishda xato:\n{e}")
+                return
+        
+        boundary_path = os.path.join(react_public_dir, 'boundary.geojson')
+        try:
             with open(boundary_path, 'w', encoding='utf-8') as f:
                 json.dump(boundary_feat, f)
         except Exception as e:
-            QMessageBox.critical(self, "Xato", f"Chegarani eksport qilishda xato:\n{e}")
+            QMessageBox.critical(self, "Xato", f"boundary.geojson saqlashda xato:\n{e}")
             return
 
         # 2. Handle Buildings
