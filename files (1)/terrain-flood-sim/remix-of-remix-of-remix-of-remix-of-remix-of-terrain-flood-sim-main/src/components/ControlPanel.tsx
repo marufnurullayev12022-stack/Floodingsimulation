@@ -109,6 +109,7 @@ export function ControlPanel() {
       })
       .then((data) => {
         setGeojson(data);
+        useAppStore.getState().setGrid(null);
         setStatus("Boundary loaded from QGIS. Auto-sampling...");
       })
       .catch(() => {}); // e'tiborsiz qoldirish
@@ -138,12 +139,13 @@ export function ControlPanel() {
           });
           
           const currentStore = useAppStore.getState();
-          currentStore.clearCustomObjects(); // avvalgilarini o'chirish
-          loadedObjects.forEach((obj: any) => currentStore.addCustomObject(obj));
+          currentStore.setCustomObjects(loadedObjects);
           toast.success(`${loadedObjects.length} ta bino QGIS dan yuklandi`);
+        } else {
+          toast.error("Bino formati xato yoki mavjud emas");
         }
       })
-      .catch(() => {}); // e'tiborsiz qoldirish
+      .catch((e) => { toast.error("Binolarni o'qishda xato: " + e.message); });
   };
 
   // Avtomatik yuklash: Plagindan kelgan fayllar

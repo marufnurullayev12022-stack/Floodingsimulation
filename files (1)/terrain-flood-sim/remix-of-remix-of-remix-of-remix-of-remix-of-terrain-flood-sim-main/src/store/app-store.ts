@@ -51,6 +51,7 @@ interface AppState {
   setIonToken: (t: string) => void;
 
   customObjects: Custom3DObject[];
+  setCustomObjects: (objs: Custom3DObject[]) => void;
   addCustomObject: (obj: Custom3DObject) => void;
   removeCustomObject: (id: string) => void;
   clearCustomObjects: () => void;
@@ -255,6 +256,17 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({ customObjects: [] });
   },
+  setCustomObjects: (objs) =>
+    set(() => {
+      if (typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem("cesium_custom_3d_objects", JSON.stringify(objs));
+        } catch (e) {
+          console.warn("localStorage quota exceeded for custom objects.");
+        }
+      }
+      return { customObjects: objs };
+    }),
 
   drawMode: "none",
   setDrawMode: (mode) => set({ drawMode: mode, drawPoints: [] }),
