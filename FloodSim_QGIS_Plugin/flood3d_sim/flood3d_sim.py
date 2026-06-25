@@ -75,7 +75,7 @@ class Flood3DSim:
             from qgis.core import (
                 QgsVectorLayer, QgsWkbTypes,
                 QgsCoordinateReferenceSystem, QgsCoordinateTransform,
-                QgsProject, QgsJsonExporter,
+                QgsProject, QgsJsonExporter, QgsVectorFileWriter
             )
             
             if not isinstance(layer, QgsVectorLayer) or layer.geometryType() != QgsWkbTypes.PolygonGeometry:

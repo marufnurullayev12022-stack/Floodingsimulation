@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsWkbTypes, QgsJsonExporter, 
-    QgsCoordinateReferenceSystem, QgsCoordinateTransform
+    QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsVectorFileWriter
 )
 
 from .ms_buildings_extractor import extract_buildings_qgis_task
