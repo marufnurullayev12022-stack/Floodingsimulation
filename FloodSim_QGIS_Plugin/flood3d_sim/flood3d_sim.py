@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QAction, QMessageBox, QApplication
 from qgis.core import QgsApplication
 
 from .server_manager import ServerManager, APP_URL
+from .flood_dialog import FloodDialog
 
 class Flood3DSim:
     def __init__(self, iface):
@@ -19,7 +20,7 @@ class Flood3DSim:
         self.server = ServerManager()
 
     def initGui(self):
-        icon_path = os.path.join(self.plugin_dir, 'toolbar_icon.png')
+        icon_path = os.path.join(self.plugin_dir, 'toolbar_icon.jpg')
         icon = QIcon(icon_path)
         
         # 1. Main Action (Start Server & Open Browser)
@@ -42,18 +43,20 @@ class Flood3DSim:
         self.server.stop()
 
     def run_simulation(self):
-        """Starts the server and opens the browser directly, bypassing any panel."""
-        if self.server.is_running():
-            webbrowser.open(APP_URL)
-            self.iface.messageBar().pushMessage("Flooding 3D", "Brauzerda ochilmoqda...", level=0, duration=3)
-        else:
-            self.iface.messageBar().pushMessage("Flooding 3D", "Server ishga tushirilmoqda. Iltimos kuting...", level=0, duration=3)
-            ok, msg = self.server.start()
-            if ok:
-                # Kutish va brauzerni ochish
-                QTimer.singleShot(5000, self._open_browser_when_ready)
+        """Oyna ochish va tanlovlarni amalga oshirish"""
+        dlg = FloodDialog(self.iface, self.iface.mainWindow())
+        if dlg.exec_():
+            # Agar OK bosilgan bo'lsa (Boshlash), brauzerni ochamiz
+            if self.server.is_running():
+                webbrowser.open(APP_URL)
+                self.iface.messageBar().pushMessage("Flooding 3D", "Brauzerda ochilmoqda...", level=0, duration=3)
             else:
-                self.iface.messageBar().pushMessage("Xatolik", msg, level=2, duration=5)
+                self.iface.messageBar().pushMessage("Flooding 3D", "Server ishga tushirilmoqda. Iltimos kuting...", level=0, duration=3)
+                ok, msg = self.server.start()
+                if ok:
+                    QTimer.singleShot(5000, self._open_browser_when_ready)
+                else:
+                    self.iface.messageBar().pushMessage("Xatolik", msg, level=2, duration=5)
 
     def _open_browser_when_ready(self):
         if self.server.is_running():

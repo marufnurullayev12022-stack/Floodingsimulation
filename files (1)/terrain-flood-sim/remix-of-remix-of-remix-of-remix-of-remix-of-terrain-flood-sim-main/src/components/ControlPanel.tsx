@@ -100,6 +100,53 @@ export function ControlPanel() {
     return () => clearInterval(id);
   }, []);
 
+  // Avtomatik yuklash: Plagindan kelgan fayllar
+  useEffect(() => {
+    // Boundary yuklash
+    fetch("/boundary.geojson")
+      .then((r) => {
+        if (!r.ok) throw new Error("boundary topilmadi");
+        return r.json();
+      })
+      .then((data) => {
+        setGeojson(data);
+        setStatus("Boundary loaded from QGIS. Auto-sampling...");
+      })
+      .catch(() => {}); // e'tiborsiz qoldirish
+
+    // Buildings yuklash
+    fetch("/buildings.geojson")
+      .then((r) => {
+        if (!r.ok) throw new Error("buildings topilmadi");
+        return r.json();
+      })
+      .then((data) => {
+        if (data.type === "FeatureCollection" && data.features) {
+          const loadedObjects = data.features.map((feat: any, idx: number) => {
+            const props = feat.properties || {};
+            // Poligon koordinatalarini ajratib olamiz
+            const coords = feat.geometry?.coordinates?.[0] || [];
+            const positions = coords.map((c: number[]) => ({ lng: c[0], lat: c[1] }));
+            return {
+              id: `qgis-bldg-${Date.now()}-${idx}`,
+              type: "polygon",
+              name: `Bino ${idx+1}`,
+              positions,
+              height: props.height_m || 4.0,
+              wallWidth: 0,
+              color: "#94a3b8", // Microsoft binolari uchun default kulrang
+            };
+          });
+          
+          const currentStore = useAppStore.getState();
+          currentStore.clearCustomObjects(); // avvalgilarini o'chirish
+          loadedObjects.forEach((obj: any) => currentStore.addCustomObject(obj));
+          toast.success(`${loadedObjects.length} ta bino yuklandi`);
+        }
+      })
+      .catch(() => {}); // e'tiborsiz qoldirish
+  }, []);
+
   // Avtomatik Sample elevation grid
   useEffect(() => {
     if (geojson && !grid && !sampling) {
