@@ -82,13 +82,20 @@ class Flood3DSim:
                 QMessageBox.warning(self.iface.mainWindow(), "Xatolik", "Faqat Polygon layerni tanlang.")
                 return
 
-            exporter = QgsJsonExporter(layer)
-            exporter.setTransformGeometries(True)
             wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
             transform = QgsCoordinateTransform(layer.crs(), wgs84, QgsProject.instance())
-            exporter.setTransform(transform)
 
-            geojson = json.loads(exporter.exportFeatures(layer.getFeatures()))
+            exporter = QgsJsonExporter(layer)
+            
+            feature_list = []
+            for feat in layer.getFeatures():
+                geom = feat.geometry()
+                if not geom.isEmpty():
+                    geom.transform(transform)
+                    feat.setGeometry(geom)
+                feature_list.append(feat)
+
+            geojson = json.loads(exporter.exportFeatures(feature_list))
             if not geojson.get("features"):
                 QMessageBox.warning(self.iface.mainWindow(), "Bo'sh", "Layerda obyekt yo'q.")
                 return

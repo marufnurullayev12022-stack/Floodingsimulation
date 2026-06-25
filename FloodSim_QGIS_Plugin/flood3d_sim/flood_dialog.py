@@ -80,12 +80,21 @@ class FloodDialog(QDialog):
                 self.bldg_combo.addItem(layer.name(), layer.id())
 
     def get_layer_geojson(self, layer):
-        exporter = QgsJsonExporter(layer)
-        exporter.setTransformGeometries(True)
         wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
         transform = QgsCoordinateTransform(layer.crs(), wgs84, QgsProject.instance())
-        exporter.setTransform(transform)
-        return json.loads(exporter.exportFeatures(layer.getFeatures()))
+        
+        exporter = QgsJsonExporter(layer)
+        
+        # Obyektlarni qo'lda transform qilish (setTransform eskirgan)
+        feature_list = []
+        for feat in layer.getFeatures():
+            geom = feat.geometry()
+            if not geom.isEmpty():
+                geom.transform(transform)
+                feat.setGeometry(geom)
+            feature_list.append(feat)
+            
+        return json.loads(exporter.exportFeatures(feature_list))
 
     def on_start(self):
         aoi_layer_id = self.aoi_combo.currentData()
