@@ -80,21 +80,39 @@ class FloodDialog(QDialog):
                 self.bldg_combo.addItem(layer.name(), layer.id())
 
     def get_layer_geojson(self, layer):
-        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
-        transform = QgsCoordinateTransform(layer.crs(), wgs84, QgsProject.instance())
+        import tempfile
+        import uuid
         
-        exporter = QgsJsonExporter(layer)
+        # Temp file to store geojson
+        temp_dir = tempfile.gettempdir()
+        out_path = os.path.join(temp_dir, f"temp_{uuid.uuid4().hex}.geojson")
         
-        # Obyektlarni qo'lda transform qilish (setTransform eskirgan)
-        feature_list = []
-        for feat in layer.getFeatures():
-            geom = feat.geometry()
-            if not geom.isEmpty():
-                geom.transform(transform)
-                feat.setGeometry(geom)
-            feature_list.append(feat)
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "GeoJSON"
+        options.fileEncoding = "UTF-8"
+        # Force EPSG:4326 output
+        options.ct = QgsCoordinateTransform(layer.crs(), QgsCoordinateReferenceSystem("EPSG:4326"), QgsProject.instance())
+        
+        # QGIS 3.20+ uses writeAsVectorFormatV3, but we use writeAsVectorFormatV2 for broader compatibility
+        # Actually writeAsVectorFormat is deprecated but universally works. Let's use it for max compatibility.
+        error = QgsVectorFileWriter.writeAsVectorFormat(
+            layer, out_path, "UTF-8", 
+            QgsCoordinateReferenceSystem("EPSG:4326"), 
+            "GeoJSON"
+        )
+        
+        if error != QgsVectorFileWriter.NoError:
+            raise Exception(f"Eksport qilishda xato: code {error}")
             
-        return json.loads(exporter.exportFeatures(feature_list))
+        with open(out_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        try:
+            os.remove(out_path)
+        except:
+            pass
+            
+        return data
 
     def on_start(self):
         aoi_layer_id = self.aoi_combo.currentData()
