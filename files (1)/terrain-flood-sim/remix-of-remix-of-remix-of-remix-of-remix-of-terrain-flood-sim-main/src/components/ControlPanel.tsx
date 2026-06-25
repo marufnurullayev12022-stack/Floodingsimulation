@@ -103,7 +103,7 @@ export function ControlPanel() {
   // Avtomatik yuklash: Plagindan kelgan fayllar
   useEffect(() => {
     // Boundary yuklash
-    fetch("/boundary.geojson")
+    fetch(`/boundary.geojson?t=${Date.now()}`)
       .then((r) => {
         if (!r.ok) throw new Error("boundary topilmadi");
         return r.json();
@@ -115,7 +115,7 @@ export function ControlPanel() {
       .catch(() => {}); // e'tiborsiz qoldirish
 
     // Buildings yuklash
-    fetch("/buildings.geojson")
+    fetch(`/buildings.geojson?t=${Date.now()}`)
       .then((r) => {
         if (!r.ok) throw new Error("buildings topilmadi");
         return r.json();
