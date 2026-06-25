@@ -100,8 +100,7 @@ export function ControlPanel() {
     return () => clearInterval(id);
   }, []);
 
-  // Avtomatik yuklash: Plagindan kelgan fayllar
-  useEffect(() => {
+  const syncFromQgis = () => {
     // Boundary yuklash
     fetch(`/boundary.geojson?t=${Date.now()}`)
       .then((r) => {
@@ -141,10 +140,15 @@ export function ControlPanel() {
           const currentStore = useAppStore.getState();
           currentStore.clearCustomObjects(); // avvalgilarini o'chirish
           loadedObjects.forEach((obj: any) => currentStore.addCustomObject(obj));
-          toast.success(`${loadedObjects.length} ta bino yuklandi`);
+          toast.success(`${loadedObjects.length} ta bino QGIS dan yuklandi`);
         }
       })
       .catch(() => {}); // e'tiborsiz qoldirish
+  };
+
+  // Avtomatik yuklash: Plagindan kelgan fayllar
+  useEffect(() => {
+    syncFromQgis();
   }, []);
 
   // Avtomatik Sample elevation grid
@@ -466,6 +470,9 @@ export function ControlPanel() {
         <Textarea rows={5} spellCheck={false} placeholder="Paste a Polygon / MultiPolygon Feature…"
           value={gjText} onChange={(e) => setGjText(e.target.value)} className="font-mono text-[11px]" />
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={syncFromQgis}>
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> QGIS dan yangilash
+          </Button>
           <Button size="sm" onClick={() => loadGeojson(gjText)} disabled={!gjText.trim()}>Load</Button>
           <Button size="sm" variant="secondary" onClick={() => { setGjText(SAMPLE_GEOJSON); loadGeojson(SAMPLE_GEOJSON); }}>Use sample</Button>
           <label className="inline-flex">
