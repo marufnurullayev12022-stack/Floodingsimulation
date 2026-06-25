@@ -93,7 +93,10 @@ class Flood3DSim:
                 QgsCoordinateReferenceSystem("EPSG:4326"), 
                 "GeoJSON"
             )
-            if error != QgsVectorFileWriter.NoError:
+            
+            err_code = error[0] if isinstance(error, tuple) else error
+            
+            if err_code != QgsVectorFileWriter.NoError:
                 QMessageBox.critical(self.iface.mainWindow(), "Xato", f"Eksport xatosi: code {error}")
                 return
                 

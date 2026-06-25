@@ -116,7 +116,9 @@ class FloodDialog(QDialog):
             "GeoJSON"
         )
         
-        if error != QgsVectorFileWriter.NoError:
+        err_code = error[0] if isinstance(error, tuple) else error
+        
+        if err_code != QgsVectorFileWriter.NoError:
             raise Exception(f"Eksport qilishda xato: code {error}")
             
         with open(out_path, 'r', encoding='utf-8') as f:
