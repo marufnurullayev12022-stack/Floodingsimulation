@@ -18,6 +18,15 @@ class ServerManager:
             env = os.environ.copy()
             env["PATH"] = r"C:\Users\user\node-portable;" + env.get("PATH", "")
             
+            # Ensure public files exist before starting Vite to prevent 404 caching
+            public_dir = os.path.join(self.working_dir, "public")
+            os.makedirs(public_dir, exist_ok=True)
+            for f in ["boundary.geojson", "buildings.geojson"]:
+                f_path = os.path.join(public_dir, f)
+                if not os.path.exists(f_path):
+                    with open(f_path, "w", encoding="utf-8") as file:
+                        file.write('{"type": "FeatureCollection", "features": []}')
+
             # Use shell=True for npm on Windows
             self.process = subprocess.Popen(
                 "npm run dev",
