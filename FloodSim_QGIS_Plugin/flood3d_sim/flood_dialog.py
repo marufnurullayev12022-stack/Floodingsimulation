@@ -105,7 +105,7 @@ class FloodDialog(QDialog):
         aoi_layer = QgsProject.instance().mapLayer(aoi_layer_id)
         
         # O'zgarishlar veb-ilovaga borishi uchun react_app/public ga saqlaymiz
-        react_public_dir = os.path.abspath(os.path.join(self.plugin_dir, '../../files (1)/terrain-flood-sim/remix-of-remix-of-remix-of-remix-of-remix-of-terrain-flood-sim-main/public'))
+        react_public_dir = r"D:\Flooding3Dsimlation\files (1)\terrain-flood-sim\remix-of-remix-of-remix-of-remix-of-remix-of-terrain-flood-sim-main\public"
         
         # 1. Export AOI to boundary.geojson
         try:
